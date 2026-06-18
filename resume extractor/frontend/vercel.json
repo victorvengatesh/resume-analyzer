@@ -1,9 +1,7 @@
 {
-  "build": {
-    "env": {
-      "CI": "false"
-    }
-  },
+  "buildCommand": "npm run build",
+  "outputDirectory": "build",
+  "cleanUrls": true,
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]

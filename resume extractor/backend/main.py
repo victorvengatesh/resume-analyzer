@@ -93,22 +93,20 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(title="Resume Analyzer - Advanced")
 
 # Configure CORS
-frontend_url = os.getenv("FRONTEND_URL", "*")
+allowed_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
+frontend_url = os.getenv("FRONTEND_URL")
 if frontend_url and frontend_url != "*":
-    allowed_origins = [
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        frontend_url.rstrip("/"),
-    ]
-    allow_credentials = True
-else:
-    allowed_origins = ["*"]
-    allow_credentials = False
+    allowed_origins.append(frontend_url.rstrip("/"))
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
-    allow_credentials=allow_credentials,
+    allow_origin_regex=r"https://.*\.vercel\.app",  # Matches Vercel deployment/preview subdomains
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )

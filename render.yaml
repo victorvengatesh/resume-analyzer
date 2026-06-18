@@ -3,10 +3,13 @@ services:
     name: resume-extractor-backend
     runtime: python
     plan: free
-    buildCommand: cd "resume extractor/backend" && pip install -r requirements.txt
-    startCommand: cd "resume extractor/backend" && uvicorn main:app --host 0.0.0.0 --port 10000
+    rootDir: resume extractor/backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port 10000
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.8
       - key: GEMINI_API_KEY
+        sync: false
+      - key: FRONTEND_URL
         sync: false
