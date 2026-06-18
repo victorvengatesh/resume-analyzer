@@ -1,0 +1,29 @@
+# Environment variables
+.env
+.env.local
+
+# Python caches and compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# SQLite Database
+resume_ai.db
+
+# Uploaded resumes / temporary files
+uploads/
+backend/uploads/
+"resume extractor/backend/uploads/"
+
+# Node dependencies and production build
+node_modules/
+build/
+dist/
+
+# IDE / Environment
+.idea/
+.vscode/
+.venv/
+venv/
+env/
