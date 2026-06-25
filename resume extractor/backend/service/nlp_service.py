@@ -2,24 +2,13 @@ import os
 import re
 import json
 import logging
-from threading import Lock
-from typing import List, Dict, Any, Optional
-
-try:
-    import numpy as np
-    from sentence_transformers import SentenceTransformer
-except ImportError:
-    np = None
-    SentenceTransformer = None
-
-try:
-    from langchain_text_splitters import RecursiveCharacterTextSplitter
-except ImportError:
-    RecursiveCharacterTextSplitter = None
-
+from typing import List, Dict, Any
 
 logger = logging.getLogger("resume_analyzer.nlp_service")
 
+# ---------------------------------------------------------------------------
+# Common skills / regex helpers (unchanged from original)
+# ---------------------------------------------------------------------------
 COMMON_SKILLS = [
     "python", "java", "javascript", "typescript", "c++", "c#", "go", "ruby", "rust", "scala",
     "sql", "mysql", "postgresql", "mongodb", "redis", "sqlite", "oracle",
@@ -52,23 +41,22 @@ def clean_text(text: str) -> str:
     return text.strip()
 
 
+# ---------------------------------------------------------------------------
+# EndeeIndex — Gemini-powered semantic search (no torch / numpy / embeddings)
+# ---------------------------------------------------------------------------
 class EndeeIndex:
     """
     Lightweight in-memory semantic index for resume chunks.
-    Keeps retrieval stable and always returns top chunks when text exists.
+    Uses Gemini to rank chunks against a query instead of local embeddings.
     """
 
-    def __init__(self, embedder: Optional[SentenceTransformer]):
-        self.embedder = embedder
+    def __init__(self, embedder=None):
+        # embedder parameter kept for API compatibility — ignored
         self.chunks: List[str] = []
-        self.embeddings = None
 
     def add_documents(self, text_chunks: List[str]) -> None:
         if not text_chunks:
             logger.warning("No chunks provided to add_documents.")
-            return
-        if self.embedder is None or np is None:
-            logger.warning("Embedder unavailable; skipping vector indexing.")
             return
 
         deduped = []
@@ -86,81 +74,118 @@ class EndeeIndex:
             logger.warning("All chunks were empty/too small after cleaning.")
             return
 
-        new_embeddings = self.embedder.encode(
-            deduped,
-            normalize_embeddings=True,
-            convert_to_numpy=True,
-            show_progress_bar=False,
-        )
-
         self.chunks.extend(deduped)
-        if self.embeddings is None:
-            self.embeddings = new_embeddings
-        else:
-            self.embeddings = np.vstack([self.embeddings, new_embeddings])
-
-        logger.info("Indexed %d cleaned chunks.", len(deduped))
+        logger.info("Indexed %d cleaned chunks (text-only, no embeddings).", len(deduped))
 
     def search(self, query: str, top_k: int = 3) -> List[Dict[str, Any]]:
-        if not query or not self.chunks or self.embeddings is None or self.embedder is None or np is None:
-            logger.warning("Search skipped: query/chunks/embedder missing.")
+        """
+        Rank stored chunks against the query using Gemini.
+        Falls back to simple keyword overlap scoring if Gemini is unavailable.
+        """
+        if not query or not self.chunks:
+            logger.warning("Search skipped: query or chunks missing.")
             return []
 
         query = clean_text(query)
         if not query:
             return []
 
-        contextualized_query = f"Skills, experience, tools, and qualifications relevant to: {query}"
-        query_emb = self.embedder.encode(
-            [contextualized_query],
-            normalize_embeddings=True,
-            convert_to_numpy=True,
-            show_progress_bar=False,
-        )[0]
+        # --- Try Gemini-powered ranking ---
+        api_key = os.getenv("GEMINI_API_KEY")
+        if api_key and api_key.strip() and api_key != "your_gemini_api_key_here":
+            try:
+                return self._gemini_rank(query, top_k, api_key)
+            except Exception as e:
+                logger.warning("Gemini chunk-ranking failed, using keyword fallback: %s", e)
 
-        similarities = np.dot(self.embeddings, query_emb)
-        top_indices = np.argsort(similarities)[::-1][:top_k]
+        # --- Keyword overlap fallback ---
+        return self._keyword_rank(query, top_k)
+
+    # ---- private helpers ----
+
+    def _gemini_rank(self, query: str, top_k: int, api_key: str) -> List[Dict[str, Any]]:
+        from google import genai
+
+        numbered = "\n".join(
+            f"[{i}] {chunk[:500]}" for i, chunk in enumerate(self.chunks)
+        )
+
+        prompt = f"""You are a resume-ranking assistant.
+
+Job query: {query}
+
+Resume chunks (numbered):
+{numbered}
+
+Return a JSON array of the top {top_k} most relevant chunk numbers, each with a relevance score from 0.0 to 1.0.
+Format: [{{"index": 0, "score": 0.85}}, ...]
+Only return the JSON array, nothing else."""
+
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=prompt,
+            config={
+                "response_mime_type": "application/json",
+                "temperature": 0.0,
+            },
+        )
+
+        ranked = json.loads(response.text)
 
         results = []
-        for idx in top_indices:
-            score = float(similarities[idx])
-            results.append({
-                "text": self.chunks[int(idx)],
-                "score": round(score, 4)
-            })
+        for item in ranked[:top_k]:
+            idx = int(item.get("index", 0))
+            score = float(item.get("score", 0.0))
+            if 0 <= idx < len(self.chunks):
+                results.append({
+                    "text": self.chunks[idx],
+                    "score": round(min(max(score, 0.0), 1.0), 4),
+                })
 
-        logger.info(
-            "Retrieved %d chunks | best score=%.4f",
-            len(results),
-            results[0]["score"] if results else 0.0
-        )
+        if results:
+            logger.info(
+                "Gemini ranked %d chunks | best score=%.4f",
+                len(results),
+                results[0]["score"],
+            )
+        return results
+
+    def _keyword_rank(self, query: str, top_k: int) -> List[Dict[str, Any]]:
+        """Simple keyword-overlap fallback when Gemini is unavailable."""
+        query_words = set(clean_text(query).lower().split())
+        scored = []
+        for chunk in self.chunks:
+            chunk_words = set(chunk.lower().split())
+            overlap = len(query_words & chunk_words)
+            total = len(query_words) if query_words else 1
+            score = round(overlap / total, 4)
+            scored.append({"text": chunk, "score": score})
+
+        scored.sort(key=lambda x: x["score"], reverse=True)
+        results = scored[:top_k]
+
+        if results:
+            logger.info(
+                "Keyword-ranked %d chunks | best score=%.4f",
+                len(results),
+                results[0]["score"],
+            )
         return results
 
 
+# ---------------------------------------------------------------------------
+# NLPService — all Gemini, zero torch
+# ---------------------------------------------------------------------------
 class NLPService:
-    _embedder = None
-    _embedder_lock = Lock()
 
     @classmethod
     def get_embedder(cls):
-        if cls._embedder is not None:
-            return cls._embedder
-
-        if SentenceTransformer is None:
-            logger.error("sentence-transformers is not installed.")
-            return None
-
-        with cls._embedder_lock:
-            if cls._embedder is None:
-                try:
-                    logger.info("Loading embedder: all-MiniLM-L6-v2")
-                    cls._embedder = SentenceTransformer("all-MiniLM-L6-v2")
-                    logger.info("Embedder loaded successfully.")
-                except Exception as e:
-                    logger.exception("Failed to load embedder: %s", e)
-                    cls._embedder = None
-
-        return cls._embedder
+        """
+        Kept for API compatibility with main.py.
+        Returns None — embeddings are no longer used.
+        """
+        return None
 
     @staticmethod
     def extract_entities(text: str) -> Dict[str, str]:
@@ -180,31 +205,58 @@ class NLPService:
 
     @staticmethod
     def chunk_document(text: str, chunk_size: int = 700, chunk_overlap: int = 120) -> List[str]:
+        """
+        Pure-Python text chunking — no langchain dependency needed.
+        Splits on paragraph breaks, then sentences, then by character limit.
+        """
         text = clean_text(text)
         if not text:
             logger.warning("chunk_document received empty text.")
             return []
 
-        if RecursiveCharacterTextSplitter is not None:
-            splitter = RecursiveCharacterTextSplitter(
-                chunk_size=chunk_size,
-                chunk_overlap=chunk_overlap,
-                separators=["\n\n", "\n", ".", ";", ",", " ", ""]
-            )
-            chunks = splitter.split_text(text)
-        else:
-            words = text.split()
-            if not words:
-                return []
-            window = 120
-            step = 90
-            chunks = []
-            for i in range(0, len(words), step):
-                chunk = " ".join(words[i:i + window]).strip()
-                if chunk:
-                    chunks.append(chunk)
+        # Split on double-newlines first, then single newlines
+        paragraphs = re.split(r"\n{2,}", text)
+        raw_segments: List[str] = []
+        for para in paragraphs:
+            para = para.strip()
+            if not para:
+                continue
+            if len(para) <= chunk_size:
+                raw_segments.append(para)
+            else:
+                # Split long paragraphs by sentences
+                sentences = re.split(r"(?<=[.!?;])\s+", para)
+                current = ""
+                for sent in sentences:
+                    if len(current) + len(sent) + 1 <= chunk_size:
+                        current = (current + " " + sent).strip()
+                    else:
+                        if current:
+                            raw_segments.append(current)
+                        current = sent
+                if current:
+                    raw_segments.append(current)
 
-        cleaned_chunks = []
+        # Merge small segments and enforce chunk_size with overlap
+        chunks: List[str] = []
+        buffer = ""
+        for seg in raw_segments:
+            if len(buffer) + len(seg) + 1 <= chunk_size:
+                buffer = (buffer + " " + seg).strip()
+            else:
+                if buffer:
+                    chunks.append(buffer)
+                # Carry overlap from end of previous buffer
+                if chunk_overlap > 0 and buffer:
+                    overlap_text = buffer[-chunk_overlap:]
+                    buffer = (overlap_text + " " + seg).strip()
+                else:
+                    buffer = seg
+        if buffer:
+            chunks.append(buffer)
+
+        # Deduplicate and filter tiny chunks
+        cleaned_chunks: List[str] = []
         seen = set()
         for chunk in chunks:
             c = clean_text(chunk)
@@ -280,7 +332,7 @@ class NLPService:
         found_skills = NLPService._extract_skills(cleaned_text)
         missing = NLPService._infer_missing_skills(job_query, found_skills)
 
-        # Better scaling for semantic scores from MiniLM cosine space
+        # Scoring: weighted combination of semantic + evidence + skills
         semantic_component = max(0.0, min(best_score, 1.0)) * 70
         evidence_component = max(0.0, min(avg_score, 1.0)) * 20
         skill_component = min(len(found_skills) * 1.5, 10)
