@@ -7,7 +7,7 @@ from typing import List, Dict, Any
 logger = logging.getLogger("resume_analyzer.nlp_service")
 
 # ---------------------------------------------------------------------------
-# Common skills / regex helpers (unchanged from original)
+# Common skills / regex helpers
 # ---------------------------------------------------------------------------
 COMMON_SKILLS = [
     "python", "java", "javascript", "typescript", "c++", "c#", "go", "ruby", "rust", "scala",
@@ -54,14 +54,14 @@ class EndeeIndex:
         # embedder parameter kept for API compatibility — ignored
         self.chunks: List[str] = []
 
-    def add_documents(self, text_chunks: List[str]) -> None:
-        if not text_chunks:
+    def add_documents(self, chunks: List[str]) -> None:
+        if not chunks:
             logger.warning("No chunks provided to add_documents.")
             return
 
         deduped = []
         seen = set()
-        for chunk in text_chunks:
+        for chunk in chunks:
             c = clean_text(chunk)
             if len(c) < 40:
                 continue
@@ -75,12 +75,13 @@ class EndeeIndex:
             return
 
         self.chunks.extend(deduped)
-        logger.info("Indexed %d cleaned chunks (text-only, no embeddings).", len(deduped))
+        logger.info("Indexed %d cleaned chunks.", len(deduped))
 
-    def search(self, query: str, top_k: int = 3) -> List[Dict[str, Any]]:
+    def search(self, query: str, top_k: int = 3) -> List[str]:
         """
         Rank stored chunks against the query using Gemini.
         Falls back to simple keyword overlap scoring if Gemini is unavailable.
+        Returns a list of top_k most relevant chunks.
         """
         if not query or not self.chunks:
             logger.warning("Search skipped: query or chunks missing.")
@@ -103,7 +104,7 @@ class EndeeIndex:
 
     # ---- private helpers ----
 
-    def _gemini_rank(self, query: str, top_k: int, api_key: str) -> List[Dict[str, Any]]:
+    def _gemini_rank(self, query: str, top_k: int, api_key: str) -> List[str]:
         from google import genai
 
         numbered = "\n".join(
@@ -117,8 +118,8 @@ Job query: {query}
 Resume chunks (numbered):
 {numbered}
 
-Return a JSON array of the top {top_k} most relevant chunk numbers, each with a relevance score from 0.0 to 1.0.
-Format: [{{"index": 0, "score": 0.85}}, ...]
+Return a JSON array of the top {top_k} most relevant chunk numbers.
+Format: [0, 2, 1]
 Only return the JSON array, nothing else."""
 
         client = genai.Client(api_key=api_key)
@@ -131,27 +132,27 @@ Only return the JSON array, nothing else."""
             },
         )
 
-        ranked = json.loads(response.text)
+        try:
+            ranked = json.loads(response.text)
+            results = []
+            if isinstance(ranked, list):
+                for item in ranked:
+                    if isinstance(item, dict):
+                        idx = item.get("index")
+                    else:
+                        idx = item
+                    try:
+                        idx = int(idx)
+                        if 0 <= idx < len(self.chunks):
+                            results.append(self.chunks[idx])
+                    except (ValueError, TypeError):
+                        continue
+            return results[:top_k]
+        except Exception as e:
+            logger.warning("Failed to parse Gemini ranking response: %s. Response text: %s", e, response.text)
+            raise e
 
-        results = []
-        for item in ranked[:top_k]:
-            idx = int(item.get("index", 0))
-            score = float(item.get("score", 0.0))
-            if 0 <= idx < len(self.chunks):
-                results.append({
-                    "text": self.chunks[idx],
-                    "score": round(min(max(score, 0.0), 1.0), 4),
-                })
-
-        if results:
-            logger.info(
-                "Gemini ranked %d chunks | best score=%.4f",
-                len(results),
-                results[0]["score"],
-            )
-        return results
-
-    def _keyword_rank(self, query: str, top_k: int) -> List[Dict[str, Any]]:
+    def _keyword_rank(self, query: str, top_k: int) -> List[str]:
         """Simple keyword-overlap fallback when Gemini is unavailable."""
         query_words = set(clean_text(query).lower().split())
         scored = []
@@ -159,19 +160,11 @@ Only return the JSON array, nothing else."""
             chunk_words = set(chunk.lower().split())
             overlap = len(query_words & chunk_words)
             total = len(query_words) if query_words else 1
-            score = round(overlap / total, 4)
-            scored.append({"text": chunk, "score": score})
+            score = overlap / total
+            scored.append((chunk, score))
 
-        scored.sort(key=lambda x: x["score"], reverse=True)
-        results = scored[:top_k]
-
-        if results:
-            logger.info(
-                "Keyword-ranked %d chunks | best score=%.4f",
-                len(results),
-                results[0]["score"],
-            )
-        return results
+        scored.sort(key=lambda x: x[1], reverse=True)
+        return [chunk for chunk, score in scored[:top_k]]
 
 
 # ---------------------------------------------------------------------------
@@ -204,71 +197,47 @@ class NLPService:
         }
 
     @staticmethod
-    def chunk_document(text: str, chunk_size: int = 700, chunk_overlap: int = 120) -> List[str]:
+    def chunk_document(text: str) -> List[str]:
         """
-        Pure-Python text chunking — no langchain dependency needed.
-        Splits on paragraph breaks, then sentences, then by character limit.
+        Splits text every 700 chars on sentence boundaries using simple Python only.
         """
         text = clean_text(text)
         if not text:
-            logger.warning("chunk_document received empty text.")
             return []
 
-        # Split on double-newlines first, then single newlines
-        paragraphs = re.split(r"\n{2,}", text)
-        raw_segments: List[str] = []
-        for para in paragraphs:
-            para = para.strip()
-            if not para:
+        # Simple sentence boundary splitting using regex (simple Python)
+        sentences = re.split(r"(?<=[.!?])\s+", text)
+        chunks = []
+        current_chunk = []
+        current_length = 0
+
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if not sentence:
                 continue
-            if len(para) <= chunk_size:
-                raw_segments.append(para)
-            else:
-                # Split long paragraphs by sentences
-                sentences = re.split(r"(?<=[.!?;])\s+", para)
-                current = ""
-                for sent in sentences:
-                    if len(current) + len(sent) + 1 <= chunk_size:
-                        current = (current + " " + sent).strip()
-                    else:
-                        if current:
-                            raw_segments.append(current)
-                        current = sent
-                if current:
-                    raw_segments.append(current)
 
-        # Merge small segments and enforce chunk_size with overlap
-        chunks: List[str] = []
-        buffer = ""
-        for seg in raw_segments:
-            if len(buffer) + len(seg) + 1 <= chunk_size:
-                buffer = (buffer + " " + seg).strip()
-            else:
-                if buffer:
-                    chunks.append(buffer)
-                # Carry overlap from end of previous buffer
-                if chunk_overlap > 0 and buffer:
-                    overlap_text = buffer[-chunk_overlap:]
-                    buffer = (overlap_text + " " + seg).strip()
-                else:
-                    buffer = seg
-        if buffer:
-            chunks.append(buffer)
-
-        # Deduplicate and filter tiny chunks
-        cleaned_chunks: List[str] = []
-        seen = set()
-        for chunk in chunks:
-            c = clean_text(chunk)
-            if len(c) < 40:
+            # If a single sentence is longer than 700 chars, split it by character slices
+            if len(sentence) > 700:
+                if current_chunk:
+                    chunks.append(" ".join(current_chunk))
+                    current_chunk = []
+                    current_length = 0
+                for i in range(0, len(sentence), 700):
+                    chunks.append(sentence[i:i+700])
                 continue
-            key = c.lower()
-            if key not in seen:
-                seen.add(key)
-                cleaned_chunks.append(c)
 
-        logger.info("Created %d useful chunks.", len(cleaned_chunks))
-        return cleaned_chunks[:20]
+            if current_length + len(sentence) + (1 if current_chunk else 0) <= 700:
+                current_chunk.append(sentence)
+                current_length += len(sentence) + (1 if current_chunk else 0)
+            else:
+                chunks.append(" ".join(current_chunk))
+                current_chunk = [sentence]
+                current_length = len(sentence)
+
+        if current_chunk:
+            chunks.append(" ".join(current_chunk))
+
+        return chunks
 
     @staticmethod
     def _extract_skills(text: str) -> List[str]:
@@ -287,7 +256,7 @@ class NLPService:
         return missing[:8]
 
     @staticmethod
-    def _semantic_fallback_score(job_query: str, resume_chunks: List[Dict[str, Any]], raw_text: str = "") -> Dict[str, Any]:
+    def _semantic_fallback_score(job_query: str, resume_chunks: List[Any], raw_text: str = "") -> Dict[str, Any]:
         cleaned_text = clean_text(raw_text)
 
         if not cleaned_text:
@@ -303,7 +272,23 @@ class NLPService:
                 "confidence": 0.0
             }
 
-        if not resume_chunks:
+        # Handle both list of dicts and list of strings
+        context_list = []
+        scores = []
+        query_words = set(clean_text(job_query).lower().split())
+        for c in resume_chunks:
+            if isinstance(c, dict):
+                context_list.append(c.get("text", ""))
+                scores.append(float(c.get("score", 0.0)))
+            else:
+                context_list.append(c)
+                # Compute simple keyword score
+                chunk_words = set(c.lower().split())
+                overlap = len(query_words & chunk_words)
+                total = len(query_words) if query_words else 1
+                scores.append(overlap / total)
+
+        if not context_list:
             found_skills = NLPService._extract_skills(cleaned_text)
             missing = NLPService._infer_missing_skills(job_query, found_skills)
 
@@ -325,7 +310,6 @@ class NLPService:
                 "confidence": 0.0
             }
 
-        scores = [float(c.get("score", 0.0)) for c in resume_chunks]
         best_score = max(scores) if scores else 0.0
         avg_score = sum(scores) / len(scores) if scores else 0.0
 
@@ -348,7 +332,7 @@ class NLPService:
         else:
             match_level = "Weak Match"
 
-        top_chunks = [c["text"] for c in resume_chunks[:3]]
+        top_chunks = context_list[:3]
 
         explanation = (
             f"The resume shows a semantic match score of {best_score:.2f} on the strongest retrieved chunk "
@@ -381,10 +365,10 @@ class NLPService:
         }
 
     @staticmethod
-    def evaluate_resume_rag(job_query: str, resume_chunks: List[Dict[str, Any]], raw_text: str = "") -> Dict[str, Any]:
+    def evaluate_resume_rag(query: str, chunks: List[Any], raw_text: str = "") -> Dict[str, Any]:
         logger.info(
             "evaluate_resume_rag called | chunks=%d | gemini=%s",
-            len(resume_chunks),
+            len(chunks),
             bool(os.getenv("GEMINI_API_KEY"))
         )
 
@@ -402,9 +386,19 @@ class NLPService:
                 "confidence": 0.0
             }
 
-        context_list = [c["text"] for c in resume_chunks]
+        # Handle both list of dicts and list of strings
+        context_list = []
+        scores = []
+        for c in chunks:
+            if isinstance(c, dict):
+                context_list.append(c.get("text", ""))
+                scores.append(float(c.get("score", 0.0)))
+            else:
+                context_list.append(c)
+                scores.append(0.0)
+
         context = "\n\n---\n\n".join(context_list)
-        confidence = max([c.get("score", 0.0) for c in resume_chunks], default=0.0)
+        confidence = max(scores, default=0.0)
 
         api_key = os.getenv("GEMINI_API_KEY")
         if api_key and api_key.strip() and api_key != "your_gemini_api_key_here" and context_list:
@@ -433,7 +427,7 @@ class NLPService:
 
                 prompt = f"""
 Job Requirement:
-{job_query}
+{query}
 
 Resume Context Fragments:
 {context}
@@ -485,4 +479,4 @@ Rules:
             except Exception as e:
                 logger.exception("Gemini evaluation failed, falling back to semantic scorer: %s", e)
 
-        return NLPService._semantic_fallback_score(job_query, resume_chunks, cleaned_text)
+        return NLPService._semantic_fallback_score(query, chunks, cleaned_text)
