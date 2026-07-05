@@ -1,29 +1,76 @@
-# Environment variables
+# ═══════════════════════════════════════════════════════════════════
+# Smart Resume Analyzer — Git Ignore Rules
+# ═══════════════════════════════════════════════════════════════════
+
+# ── Environment variables (NEVER commit secrets) ─────────────────
 .env
 .env.local
+.env.production
+backend/.env
+frontend/.env
 
-# Python caches and compiled files
+# ── Python caches and compiled files ─────────────────────────────
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.pyw
+*.pyz
 
-# SQLite Database
-resume_ai.db
-
-# Uploaded resumes / temporary files
-uploads/
-backend/uploads/
-"resume extractor/backend/uploads/"
-
-# Node dependencies and production build
-node_modules/
-build/
-dist/
-
-# IDE / Environment
-.idea/
-.vscode/
+# ── Python virtual environments ───────────────────────────────────
 .venv/
 venv/
 env/
+ENV/
+
+# ── Python test / coverage artifacts ─────────────────────────────
+.pytest_cache/
+backend/.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+*.egg
+
+# ── SQLite Database files (all locations) ────────────────────────
+*.db
+*.db-shm
+*.db-wal
+resume_ai.db
+backend/resume_ai.db
+
+# ── Upload directories (user data — not for VCS) ─────────────────
+uploads/
+backend/uploads/
+backend/temp/
+
+# ── Node dependencies and production build ────────────────────────
+node_modules/
+frontend/node_modules/
+build/
+dist/
+frontend/dist/
+.next/
+.nuxt/
+.output/
+
+# ── IDE / Editor directories ──────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Logs ──────────────────────────────────────────────────────────
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Docker local overrides ────────────────────────────────────────
+docker-compose.override.yml
+
+# ── Alembic auto-generated (keep migrations, ignore runtime files) 
+# alembic/versions/ — intentionally tracked

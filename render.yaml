@@ -1,12 +1,38 @@
 services:
   - type: web
-    name: resume-extractor-backend
+    name: resume-analyzer-backend
     runtime: python
     plan: free
-    buildCommand: pip install -r "resume extractor/backend/requirements.txt"
-    startCommand: uvicorn main:app --host 0.0.0.0 --port 10000 --app-dir "resume extractor/backend"
+    rootDir: .
+    buildCommand: pip install -r backend/requirements.txt
+    # Render injects $PORT dynamically — do NOT hardcode a port number
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.8
+      - key: PYTHONPATH
+        value: "."
+      # ── Required secrets — set in Render dashboard ──────────────
       - key: GEMINI_API_KEY
         sync: false
+      - key: SECRET_KEY
+        sync: false
+      # ── CORS origin — set to your Vercel frontend URL ───────────
+      - key: FRONTEND_URL
+        sync: false
+      # ── Database — defaults to SQLite, set PostgreSQL URL for prod
+      - key: DATABASE_URL
+        sync: false
+      # ── Application configuration ───────────────────────────────
+      - key: APP_MODE
+        value: production
+      - key: ENABLE_AUTH
+        value: "true"
+      - key: ENABLE_USAGE_LIMITS
+        value: "true"
+      - key: ENABLE_ANALYTICS
+        value: "false"
+      - key: UPLOAD_DIR
+        value: /tmp/uploads
+      - key: MAX_WORKERS
+        value: "4"
