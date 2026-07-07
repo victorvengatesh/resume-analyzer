@@ -10,8 +10,8 @@ services:
     region: oregon
     plan: free
     branch: main
-    buildCommand: pip install -r backend/requirements.txt
-    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+    buildCommand: cd backend && pip install -r requirements.txt
+    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT --workers 2
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.11
@@ -32,7 +32,7 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: FRONTEND_URL
-        value: https://frontend-mztwp8yvz-victorvengateshs-projects.vercel.app
+        value: https://frontend-nu-cyan-63.vercel.app
     disk:
       name: resume-data
       mountPath: /data
