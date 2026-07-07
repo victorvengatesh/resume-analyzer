@@ -1,15 +1,14 @@
 """
 Vercel serverless function entry point for FastAPI backend.
-This file is required for Vercel's Python runtime.
 """
 import sys
-from pathlib import Path
+import os
 
-# Add backend directory to Python path
-backend_dir = Path(__file__).parent.parent
-sys.path.insert(0, str(backend_dir.parent))
+# Set up Python path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend.main import app
+# Import the FastAPI app
+from main import app as application
 
-# Export the FastAPI app instance for Vercel
-app = app
+# Vercel expects a variable named 'app'
+app = application
