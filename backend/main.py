@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.core.config import settings
@@ -17,7 +18,7 @@ from datetime import datetime, timezone
 # Setup Logging
 logger = setup_logging()
 
-# Setup Database Tables (auto-create all models)
+# Import all models to ensure they're registered with SQLAlchemy
 import backend.models.batch  # noqa: F401
 import backend.models.interview  # noqa: F401
 import backend.models.activity  # noqa: F401
@@ -25,7 +26,33 @@ import backend.models.user  # noqa: F401
 import backend.models.workspace  # noqa: F401
 import backend.models.audit_log  # noqa: F401
 
-Base.metadata.create_all(bind=engine)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    FastAPI lifespan event handler for startup and shutdown.
+    
+    Gracefully handles database initialization:
+    - If database is unavailable during startup, logs error but allows app to start
+    - This prevents deployment failures due to temporary database connection issues
+    - Compatible with both SQLite and PostgreSQL
+    """
+    logger.info("🚀 Starting Smart Resume Analyzer backend...")
+    
+    # Attempt database initialization with error handling
+    try:
+        Base.metadata.create_all(bind=engine)
+        logger.info("✅ Database tables created/verified successfully")
+    except Exception as e:
+        logger.error(f"⚠️  Database initialization failed: {e}")
+        logger.error("⚠️  Application starting in degraded mode - database may be temporarily unavailable")
+        logger.error("⚠️  Database operations will be retried on first request")
+    
+    yield
+    
+    # Shutdown
+    logger.info("🛑 Shutting down Smart Resume Analyzer backend...")
+
 
 app = FastAPI(
     title=settings.app_name,
@@ -33,6 +60,7 @@ app = FastAPI(
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
+    lifespan=lifespan,
 )
 
 # Middlewares

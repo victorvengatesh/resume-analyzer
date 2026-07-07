@@ -139,7 +139,7 @@ export default function BulkAnalyzer() {
   const [sortKey, setSortKey] = useState<'rank' | 'score' | 'name' | 'exp'>('rank');
   const [sortAsc, setSortAsc] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
 
   // ── File management ──────────────────────────────────────────
 
@@ -460,7 +460,11 @@ export default function BulkAnalyzer() {
                 {!isLoading && <button onClick={() => setFiles([])} className="text-xs text-rose-400 hover:text-rose-300">Clear all</button>}
               </div>
               {files.map((f, i) => (
-                <div key={i} className="flex items-center gap-3 bg-slate-800 rounded-xl px-4 py-2.5 border border-slate-700">
+                <div
+                  // BUG 5 FIX: key uses filename+size, not array index.
+                  key={`${f.name}-${f.size}`}
+                  className="flex items-center gap-3 bg-slate-800 rounded-xl px-4 py-2.5 border border-slate-700"
+                >
                   <FileText className="w-4 h-4 text-violet-400 flex-shrink-0" />
                   <span className="flex-1 text-sm text-slate-300 truncate">{f.name}</span>
                   <span className="text-xs text-slate-500 flex-shrink-0">{fmtSize(f.size)}</span>
@@ -714,7 +718,10 @@ export default function BulkAnalyzer() {
                     filtered.map(c => {
                       const name = c.original_name?.replace(/\.(pdf|docx?|txt)$/i, '') || 'Unknown';
                       const rankBg = c.rank === 1 ? 'bg-amber-500/5' : c.rank === 2 ? 'bg-slate-400/5' : c.rank === 3 ? 'bg-orange-700/5' : '';
-                      const isExpanded = expandedId === c.original_name;
+                      // BUG 6 FIX: use c.rank (unique per batch) as the expand key.
+                      // Previously c.original_name was used — two files named
+                      // "resume.pdf" would both expand/collapse on a single click.
+                      const isExpanded = expandedId === c.rank;
 
                       return (
                         <Fragment key={`row-${c.rank}`}>
@@ -804,7 +811,7 @@ export default function BulkAnalyzer() {
                                   </button>
                                 )}
                                 <button
-                                  onClick={() => setExpandedId(isExpanded ? null : c.original_name)}
+                                  onClick={() => setExpandedId(isExpanded ? null : c.rank)}
                                   className="p-1.5 rounded-lg text-slate-500 hover:text-violet-400 hover:bg-violet-500/10 transition-all"
                                   title={isExpanded ? 'Collapse' : 'AI Explanation'}
                                 >

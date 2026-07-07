@@ -18,9 +18,14 @@ def test_defaults(monkeypatch):
         "DATABASE_URL", "UPLOAD_DIR", "ROLE_SKILLS_FILE", "USE_OCR",
         "MAX_FILE_BYTES", "FRONTEND_URL", "APP_NAME", "APP_MODE",
         "APP_VERSION", "ENABLE_AUTH", "ENABLE_USAGE_LIMITS",
-        "ENABLE_ANALYTICS", "SECRET_KEY",
+        "ENABLE_ANALYTICS", "SECRET_KEY", "GEMINI_API_KEY",
     ]:
         monkeypatch.delenv(key, raising=False)
+
+    # Ensure .env values don't bleed in by overriding Optional fields to empty.
+    # Settings._coerce_empty_optionals will convert "" → None.
+    monkeypatch.setenv("FRONTEND_URL", "")
+    monkeypatch.setenv("GEMINI_API_KEY", "")
 
     s = reload_settings()
     assert s.database_url == "sqlite:///./resume_ai.db"

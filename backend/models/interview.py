@@ -33,7 +33,7 @@ class InterviewKit(Base):
     suggested_salary_level = Column(String)
 
     generated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    model_used = Column(String, default="gemini-1.5-flash")
+    model_used = Column(String, default="gemini-2.5-flash")
 
 
 class InterviewSession(Base):

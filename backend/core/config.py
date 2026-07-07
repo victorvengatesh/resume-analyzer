@@ -4,6 +4,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger("resume_analyzer.config")
@@ -37,6 +38,20 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
+
+    @model_validator(mode="after")
+    def _coerce_empty_optionals(self) -> "Settings":
+        """
+        Treat empty-string values in .env as unset for all Optional[str] fields.
+        Without this, FRONTEND_URL= in .env produces '' instead of None,
+        which breaks CORS logic (all origins would be enabled for an empty-
+        string origin) and causes test_defaults to fail.
+        """
+        for field_name in ("frontend_url", "gemini_api_key"):
+            val = getattr(self, field_name)
+            if isinstance(val, str) and val.strip() == "":
+                object.__setattr__(self, field_name, None)
+        return self
 
 
 settings = Settings()

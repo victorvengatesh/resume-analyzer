@@ -2,7 +2,7 @@ import os
 import re
 import tempfile
 import logging
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from backend.core.config import settings
@@ -187,21 +187,34 @@ class ResumeService:
 
     @staticmethod
     def process_batch(files_data: List[Tuple[str, bytes]], job_role: str) -> Tuple[List[Dict[str, Any]], List[Dict[str, str]]]:
-        results = []
-        errors = []
+        """
+        Process every file independently and return results in the SAME ORDER as
+        files_data (i.e. the order the caller uploaded them).
+
+        as_completed() yields futures in *completion* order, which is non-
+        deterministic under concurrent execution.  We therefore store each
+        future alongside its original list index, collect results into a
+        pre-sized list, and fill errors by position so ordering is preserved.
+        """
+        n = len(files_data)
+        ordered: List[Optional[Dict[str, Any]]] = [None] * n   # result slot per file
+        errors: List[Dict[str, str]] = []
 
         with ThreadPoolExecutor(max_workers=settings.max_workers) as exe:
+            # Key: future → (original_index, filename)
             futures = {
-                exe.submit(ResumeService.process_single_resume, data, name, job_role): name 
-                for name, data in files_data
+                exe.submit(ResumeService.process_single_resume, data, name, job_role): (idx, name)
+                for idx, (name, data) in enumerate(files_data)
             }
             for fut in as_completed(futures):
-                name = futures[fut]
+                idx, name = futures[fut]
                 try:
-                    r = fut.result()
-                    results.append(r)
+                    ordered[idx] = fut.result()
                 except Exception as e:
-                    logger.exception(f"Processing {name} failed: {e}")
+                    logger.exception(f"Processing '{name}' (index {idx}) failed: {e}")
                     errors.append({"file": name, "error": str(e)})
 
+        # Drop None slots (files that errored) from the results list while
+        # keeping successful results in original upload order.
+        results = [r for r in ordered if r is not None]
         return results, errors

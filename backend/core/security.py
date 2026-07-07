@@ -124,9 +124,15 @@ async def secure_file_validation(file: UploadFile) -> bytes:
             detail="Unsupported file type. Allowed: PDF, DOCX, DOC, TXT.",
         )
 
-    # 3. Read magic bytes (first 2 KB)
-    head = await file.read(2048)
-    await file.seek(0)
+    # 3. Read the ENTIRE file once into memory, then slice for magic-byte check.
+    #    Reading head separately and then calling read() again would return
+    #    bytes AFTER position 2048 — concatenating both would duplicate the
+    #    first 2 KB and corrupt PDFs (broken offset table) and DOCX files
+    #    (broken ZIP local-file-header offsets).
+    content = await file.read()
+    await file.seek(0)  # leave the file pointer in a clean state
+
+    head = content[:2048]  # slice — no extra I/O, no duplication
 
     signatures = _MAGIC[ext]
     if signatures:
@@ -146,20 +152,15 @@ async def secure_file_validation(file: UploadFile) -> bytes:
                 detail="Text file is not valid UTF-8.",
             )
 
-    # 4. Read full content and enforce size limit
-    content = await file.read()
-    await file.seek(0)
-
-    total = len(head) + len(content)
-    if total > config_module.settings.max_file_bytes:
+    # 4. Enforce size limit
+    if len(content) > config_module.settings.max_file_bytes:
         max_mb = config_module.settings.max_file_bytes / (1024 * 1024)
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=f"File exceeds the maximum allowed size of {max_mb:.0f} MB.",
         )
 
-    # Return the full bytes (head + rest)
-    return head + content
+    return content
 
 
 # ─────────────────────────────────────────────────────────────────

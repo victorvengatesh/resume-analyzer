@@ -169,8 +169,12 @@ export default function UploadPage() {
               className="space-y-2"
             >
               {files.map((f, i) => (
-                <motion.div 
-                  key={i} 
+                <motion.div
+                  // BUG 5 FIX: key uses filename+size, not array index.
+                  // Array-index keys cause React to reuse DOM nodes when a file
+                  // is removed from the middle, which breaks exit animations and
+                  // can mis-fire the remove handler on the wrong file.
+                  key={`${f.name}-${f.size}`}
                   initial={{ x: -10, opacity: 0 }}
                   animate={{ x: 0, opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -179,8 +183,8 @@ export default function UploadPage() {
                   <FileText className="w-4 h-4 text-violet-400 flex-shrink-0 animate-pulse" />
                   <span className="flex-1 text-xs text-slate-300 truncate font-mono">{f.name}</span>
                   <span className="text-[10px] text-slate-500 font-mono">{fmtSize(f.size)}</span>
-                  <button 
-                    onClick={() => removeFile(i)} 
+                  <button
+                    onClick={() => removeFile(i)}
                     className="text-slate-500 hover:text-rose-450 p-1 rounded-lg transition-colors"
                     disabled={loading}
                   >
@@ -246,11 +250,15 @@ export default function UploadPage() {
               Ingestion complete — {results.length} record(s) cataloged
             </div>
 
-            {results.map((r, i) => {
+            {results.map((r) => {
               const name = r.filename?.replace(/\.(pdf|docx?)$/i, '').replace(/_Resume|_/g, ' ') || 'Candidate';
               return (
-                <motion.div 
-                  key={i} 
+                <motion.div
+                  // BUG 5 FIX: key uses r.id (UUID), not array index.
+                  // When results are replaced after a new upload, React correctly
+                  // unmounts every old card and mounts fresh ones rather than
+                  // patching mismatched nodes in place.
+                  key={r.id}
                   variants={listItem}
                   className="glass-panel border border-glass-border rounded-2xl p-6 space-y-4 hover:border-violet-500/20 transition-all duration-300"
                 >

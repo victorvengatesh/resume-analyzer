@@ -124,7 +124,7 @@ Only return the JSON array, nothing else."""
 
         client = genai.Client(api_key=api_key)
         response = client.models.generate_content(
-            model="gemini-1.5-flash",
+            model="gemini-2.5-flash",
             contents=prompt,
             config={
                 "response_mime_type": "application/json",
@@ -467,7 +467,7 @@ Rules:
 """
 
                 response = client.models.generate_content(
-                    model="gemini-1.5-flash",
+                    model="gemini-2.5-flash",
                     contents=prompt,
                     config={
                         "system_instruction": system_instruction,

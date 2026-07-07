@@ -1,0 +1,5 @@
+# Root-level requirements.txt — delegates to backend/requirements.txt
+# Render's Python native runtime scans for this file at the repo root.
+# The actual pinned dependencies live in backend/requirements.txt.
+# This file exists so Render auto-detects the project as Python.
+-r backend/requirements.txt

@@ -3,36 +3,65 @@ services:
     name: resume-analyzer-backend
     runtime: python
     plan: free
+
+    # Root of the repository (not the backend subfolder — PYTHONPATH handles imports)
     rootDir: .
-    buildCommand: pip install -r backend/requirements.txt
-    # Render injects $PORT dynamically — do NOT hardcode a port number
-    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+
+    # Build: upgrade pip first to avoid wheel-building issues, then install only
+    # production deps. Test deps (requirements-dev.txt) are intentionally excluded.
+    buildCommand: pip install --upgrade pip && pip install -r backend/requirements.txt
+
+    # Render injects $PORT at runtime — never hardcode a port number here.
+    # Workers=1 is safest on the free tier (512 MB RAM).
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT --workers 1
+
     envVars:
+      # ── Python version ─────────────────────────────────────────────────────
+      # This overrides Render's default (3.14.3 as of 2026-02-11).
+      # Must be fully qualified (major.minor.patch).
       - key: PYTHON_VERSION
-        value: 3.11.8
+        value: 3.11.11
+
+      # ── Module resolution ──────────────────────────────────────────────────
+      # Required: backend uses absolute imports (from backend.X import Y)
+      # so the project root must be on PYTHONPATH.
       - key: PYTHONPATH
         value: "."
-      # ── Required secrets — set in Render dashboard ──────────────
-      - key: GEMINI_API_KEY
-        sync: false
+
+      # ── Required secrets — set these in the Render dashboard ───────────────
+      # Generate SECRET_KEY with: python -c "import secrets; print(secrets.token_hex(32))"
       - key: SECRET_KEY
         sync: false
-      # ── CORS origin — set to your Vercel frontend URL ───────────
+
+      - key: GEMINI_API_KEY
+        sync: false
+
+      # ── CORS — set to your frontend URL (e.g. https://yourapp.vercel.app) ──
       - key: FRONTEND_URL
         sync: false
-      # ── Database — defaults to SQLite, set PostgreSQL URL for prod
+
+      # ── Database ───────────────────────────────────────────────────────────
+      # Leave unset to use SQLite (free tier, data lost on redeploy).
+      # Set to a PostgreSQL connection string for persistent storage.
       - key: DATABASE_URL
         sync: false
-      # ── Application configuration ───────────────────────────────
+
+      # ── Application behaviour ─────────────────────────────────────────────
       - key: APP_MODE
         value: production
+
       - key: ENABLE_AUTH
         value: "true"
+
       - key: ENABLE_USAGE_LIMITS
         value: "true"
+
       - key: ENABLE_ANALYTICS
         value: "false"
+
+      # Render's filesystem is ephemeral — /tmp is writable on all plans.
       - key: UPLOAD_DIR
         value: /tmp/uploads
+
       - key: MAX_WORKERS
         value: "4"

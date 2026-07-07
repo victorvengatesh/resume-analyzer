@@ -155,7 +155,7 @@ def _call_gemini(prompt: str, schema_class=None) -> Optional[Dict]:
             config["response_schema"] = schema_class
 
         response = client.models.generate_content(
-            model="gemini-1.5-flash",
+            model="gemini-2.5-flash",
             contents=prompt,
             config=config,
         )
@@ -331,7 +331,7 @@ def generate_interview_kit(resume_id: str, db: Session = Depends(get_db)):
         cons=recommendation_data.get("cons", []),
         risks=recommendation_data.get("risks", []),
         suggested_salary_level=recommendation_data.get("suggested_salary_level", "Mid-Level"),
-        model_used="gemini-1.5-flash" if os.getenv("GEMINI_API_KEY") else "rule-based-fallback",
+        model_used="gemini-2.5-flash" if os.getenv("GEMINI_API_KEY") else "rule-based-fallback",
     )
     db.add(kit)
     db.commit()
