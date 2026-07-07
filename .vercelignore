@@ -1,0 +1,12 @@
+backend/
+*.py
+*.pyc
+__pycache__/
+.pytest_cache/
+.env
+.venv/
+venv/
+*.db
+*.sqlite
+htmlcov/
+.coverage
