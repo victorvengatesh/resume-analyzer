@@ -1,8 +1,7 @@
-HEAD
 # Smart Resume Analyzer
 ### Enterprise AI Recruitment Platform — ATS + AI Interview Copilot
 
-[![Platform CI](https://github.com/your-org/smart-resume-analyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/smart-resume-analyzer/actions)
+[![Platform CI](https://github.com/victorvengatesh/resume-analyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/victorvengatesh/resume-analyzer/actions)
 
 ---
 
@@ -264,6 +263,3 @@ See [`render.yaml`](render.yaml). Set the following in the Render dashboard:
 2. Create a feature branch: `git checkout -b feature/my-feature`
 3. Run tests: `pytest`
 4. Open a pull request — CI must pass before merge
-=======
-# resume-analyzer
- 4d91027ba58726543f1c3a88d5ba183869fc2aef
