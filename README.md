@@ -1,265 +1,196 @@
 # Smart Resume Analyzer
-### Enterprise AI Recruitment Platform — ATS + AI Interview Copilot
+
+### Full-Stack AI-Assisted Recruitment Platform
 
 [![Platform CI](https://github.com/victorvengatesh/resume-analyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/victorvengatesh/resume-analyzer/actions)
 
----
+Smart Resume Analyzer is a full-stack recruitment application for resume ingestion, structured candidate analysis, ATS-style scoring, batch ranking, hiring-pipeline tracking and interview preparation.
 
-## Overview
-
-A production-ready, full-stack Applicant Tracking System (ATS) powered by Google Gemini. Handles resume ingestion, AI-based scoring, bulk candidate ranking, and interactive AI-generated interview kits — all in a clean, modular architecture.
+The project is designed to demonstrate how AI features can be integrated into a conventional web application without making the model the only source of truth.
 
 ---
 
-## Features
+## Core capabilities
 
-| Feature | Description |
+| Capability | What it does |
 |---|---|
-| **Resume Analysis** | Upload PDF/DOCX/TXT; AI extracts skills, education, experience and scores against a job role |
-| **Bulk Ranking** | Async batch processing of up to 50 resumes; live progress polling; ranked podium |
-| **AI Interview Copilot** | Gemini-generated question banks (10 technical, 5 coding, 5 scenario, 5 behavioral, 5 HR) |
-| **Recruiter Scorecard** | Per-category scoring (0-10), notes, decision, session history |
-| **ATS Pipeline** | Status tracking: Applied → Screening → Interview → Shortlisted → Offer → Hired/Rejected |
-| **Analytics Dashboard** | Score distributions, top skills, missing skills gap analysis |
-| **JWT Authentication** | Access + refresh tokens, RBAC (Admin/Recruiter/HR/Viewer), password change |
-| **Audit Logging** | Every user action logged with IP, user ID, and timestamp |
-| **Security Headers** | CSP-safe headers, MIME validation, magic-byte file checking, rate limiting |
-| **Docker** | One-command production stack: `docker compose up --build` |
+| Resume analysis | Parses PDF/DOCX/TXT resumes and extracts skills, education and experience |
+| ATS-style scoring | Scores candidates against job-role requirements with AI/rule-based support |
+| Bulk ranking | Processes multiple resumes asynchronously and ranks candidates |
+| Interview copilot | Generates role-aware technical, coding, scenario, behavioral and HR questions |
+| Recruiter scorecards | Stores category scores, notes, decisions and interview-session history |
+| Hiring pipeline | Tracks candidates from Applied through Hired/Rejected states |
+| Analytics | Summarizes score distributions, skill trends and missing-skill patterns |
+| Authentication/RBAC | Supports JWT-based access control and user roles |
+| Audit logging | Records important user actions for traceability |
+| Exports | Supports candidate data export for downstream review |
 
 ---
 
 ## Architecture
 
-```
-smart-resume-analyzer/
-├── backend/                  # FastAPI application
-│   ├── api/v1/               # Route handlers (auth, resumes, batch, interview, analytics, exports)
-│   ├── core/                 # Config, logging, middleware, security
-│   ├── db/                   # SQLAlchemy engine + session factory
-│   ├── migrations/           # Alembic migration versions
-│   ├── models/               # SQLAlchemy ORM models
-│   ├── repositories/         # Repository pattern (BaseRepository + domain repos)
-│   ├── schemas/              # Pydantic request/response models
-│   ├── services/             # Business logic (ResumeService, NLPService, AuthService)
-│   └── tests/                # pytest test suite
-└── frontend/                 # React + TypeScript + Vite
-    └── src/
-        ├── pages/            # Dashboard, Candidates, BulkAnalyzer, InterviewCopilot, ...
-        ├── layouts/          # DashboardLayout
-        └── api.ts            # Typed API client
+```text
+React + TypeScript frontend
+          │
+          ▼
+      FastAPI API
+          │
+          ├── Auth / RBAC
+          ├── Resume ingestion
+          ├── Candidate pipeline
+          ├── Batch analysis
+          ├── Interview workflows
+          ├── Analytics / exports
+          │
+          ├── AI + rule-based scoring services
+          └── SQLAlchemy / PostgreSQL or SQLite
 ```
 
-### Technology Stack
+### Technology stack
 
-**Backend:** FastAPI · SQLAlchemy 2 · Alembic · Pydantic v2 · passlib/bcrypt · python-jose · psycopg2  
-**AI:** Google Gemini 1.5 Flash (via `google-genai`) · Rule-based fallback  
-**Frontend:** React 19 · TypeScript · Vite · Tailwind CSS · Recharts · React Router v7  
-**Database:** SQLite (development) · PostgreSQL 15 (production)  
-**Infrastructure:** Docker · Docker Compose · Nginx · GitHub Actions
+**Backend:** FastAPI · SQLAlchemy 2 · Alembic · Pydantic v2  
+**AI:** Google Gemini integration · rule-based fallback paths  
+**Frontend:** React · TypeScript · Vite · Tailwind CSS · Recharts  
+**Database:** SQLite for development · PostgreSQL for production-oriented setups  
+**Infrastructure:** Docker · Docker Compose · GitHub Actions · Nginx
 
 ---
 
-## Quick Start
+## Repository structure
 
-### Prerequisites
-- Python 3.11+
-- Node.js 20+
-- A [Google Gemini API key](https://aistudio.google.com/app/apikey) (optional — fallback scoring works without it)
+```text
+resume-analyzer/
+├── backend/
+│   ├── api/v1/          API routes
+│   ├── core/            config, logging, middleware and security utilities
+│   ├── db/              database/session setup
+│   ├── migrations/      Alembic migrations
+│   ├── models/          ORM models
+│   ├── repositories/    persistence layer
+│   ├── schemas/         request/response models
+│   ├── services/        business and AI logic
+│   └── tests/           pytest suite
+├── frontend/            React + TypeScript application
+├── docker-compose.yml   local multi-service setup
+└── README.md
+```
 
-### 1. Backend
+Historical deployment/status documents remain in the repository from earlier development phases. The README and active configuration files should be treated as the primary source of current setup information.
+
+---
+
+## Quick start
+
+### Backend
 
 ```bash
-# From repo root
-cd backend
+git clone https://github.com/victorvengatesh/resume-analyzer.git
+cd resume-analyzer/backend
 python -m venv .venv
 
 # Windows
 .venv\Scripts\activate
+
 # macOS/Linux
 source .venv/bin/activate
 
 pip install -r requirements.txt
-
-# Copy and configure environment
-cp .env.example .env
-# Edit .env — set GEMINI_API_KEY at minimum
-
-# Run migrations (creates SQLite DB by default)
-cd ..
-python -m alembic -c backend/alembic.ini upgrade head
-
-# Start server
-python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-API docs: http://localhost:8000/api/docs
+Configure environment variables using the included example file, then from the repository root run migrations:
 
-### 2. Frontend
+```bash
+python -m alembic -c backend/alembic.ini upgrade head
+```
+
+Start the API:
+
+```bash
+python -m uvicorn backend.main:app --reload
+```
+
+### Frontend
 
 ```bash
 cd frontend
 npm install
-npm run dev   # starts on http://localhost:3000
+npm run dev
 ```
 
 ---
 
-## Docker (Production)
+## Docker
 
 ```bash
-# 1. Configure secrets
 cp .env.example .env
-# Edit .env — set SECRET_KEY, GEMINI_API_KEY, POSTGRES_PASSWORD
+# Configure secrets and database values before production use.
 
-# 2. Build and start
 docker compose up --build
-
-# Services:
-#   Frontend  → http://localhost:3000
-#   Backend   → http://localhost:8000
-#   API Docs  → http://localhost:8000/api/docs
 ```
 
----
-
-## Environment Variables
-
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `GEMINI_API_KEY` | Yes* | — | Google Gemini key (`*` rule-based fallback works without it) |
-| `SECRET_KEY` | **Yes in prod** | insecure default | JWT signing key — use `secrets.token_hex(32)` |
-| `DATABASE_URL` | No | SQLite | PostgreSQL URL for production |
-| `ENABLE_AUTH` | No | `false` | Set `true` in production |
-| `ENABLE_USAGE_LIMITS` | No | `false` | Enable per-IP rate limiting |
-| `FRONTEND_URL` | No | `*` | Restrict CORS to this origin |
-| `APP_MODE` | No | `demo` | `production` triggers security warnings |
-| `MAX_FILE_BYTES` | No | `10485760` | Max upload size (bytes) |
-| `MAX_WORKERS` | No | `10` | Batch processing thread pool size |
-
-Full list in [`backend/.env.example`](backend/.env.example).
+Do not use development defaults for `SECRET_KEY`, database credentials or authentication settings in a public deployment.
 
 ---
 
-## API Reference
+## Security model
 
-Base URL: `http://localhost:8000`  
-Interactive docs: [`/api/docs`](http://localhost:8000/api/docs)
+The application includes security-oriented engineering such as:
 
-### Authentication
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/v1/auth/register` | Register a new user |
-| `POST` | `/api/v1/auth/login` | Login, get access + refresh tokens |
-| `POST` | `/api/v1/auth/refresh` | Rotate tokens using refresh token |
-| `POST` | `/api/v1/auth/logout` | Log out (audit logged) |
-| `GET` | `/api/v1/auth/me` | Get current user profile |
-| `POST` | `/api/v1/auth/change-password` | Change own password |
-| `POST` | `/api/v1/auth/forgot-password` | Request password reset |
-| `GET` | `/api/v1/auth/users` | Admin: list all users |
-| `PATCH` | `/api/v1/auth/users/{id}/deactivate` | Admin: deactivate a user |
+- password hashing
+- JWT access/refresh flows
+- role-based access control
+- file type / magic-byte validation
+- filename/path handling protections
+- security headers
+- rate-limiting support
+- audit logging
 
-### Resumes
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/v1/analyze` | Upload + analyze a single resume |
-| `GET` | `/api/v1/resumes` | List candidates (filterable, paginated) |
-| `GET` | `/api/v1/resumes/{id}` | Get full candidate profile |
-| `PATCH` | `/api/v1/resumes/{id}/status` | Update pipeline status |
-| `GET` | `/api/v1/resumes/{id}/notes` | Get recruiter notes |
-| `POST` | `/api/v1/resumes/{id}/notes` | Add a recruiter note |
-| `GET` | `/api/v1/resumes/{id}/timeline` | Get activity timeline |
-
-### Batch
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/v1/batch/analyze` | Start async batch job |
-| `GET` | `/api/v1/batch/{id}/status` | Poll job status + results |
-| `GET` | `/api/v1/batch/` | List recent batch jobs |
-
-### Interview
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/v1/interview/{id}/generate` | Generate AI interview kit |
-| `GET` | `/api/v1/interview/{id}/kit` | Retrieve interview kit |
-| `GET` | `/api/v1/interview/{id}/sessions` | List interview sessions |
-| `POST` | `/api/v1/interview/{id}/sessions` | Save interview session |
-| `PATCH` | `/api/v1/interview/{id}/sessions/{sid}` | Update session |
-
-### Analytics & Exports
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/v1/analytics/dashboard` | Dashboard statistics |
-| `GET` | `/api/v1/analytics/insights` | AI-generated hiring insights |
-| `GET` | `/api/v1/exports/candidates/csv` | Export all candidates as CSV |
+These controls are implementation features, not a formal security certification. Real production use still requires threat modeling, dependency/secret scanning, authorization testing, infrastructure hardening and monitoring.
 
 ---
 
-## Database Migrations
+## Testing
 
 ```bash
-# From repo root with .venv active
-# Apply all pending migrations
-python -m alembic -c backend/alembic.ini upgrade head
-
-# Create a new migration after model changes
-python -m alembic -c backend/alembic.ini revision --autogenerate -m "describe change"
-
-# Check current migration version
-python -m alembic -c backend/alembic.ini current
+pytest
+pytest -v
+pytest backend/tests/test_auth.py
 ```
 
----
-
-## Running Tests
-
-```bash
-# From repo root
-pytest                        # run all tests
-pytest -v                     # verbose
-pytest backend/tests/test_auth.py   # single file
-pytest -k "test_login"        # filter by name
-```
+The GitHub Actions workflow is the best place to verify current automated build/test status. Avoid treating undocumented percentages or benchmark claims as guarantees unless they are backed by reproducible CI artifacts.
 
 ---
 
-## RBAC Roles
+## AI behavior
 
-| Role | Permissions |
-|---|---|
-| **Admin** | Full access including user management |
-| **Recruiter** | Upload, analyze, update status, add notes |
-| **HR** | View candidates, evaluate, add notes, interview |
-| **Viewer** | Read-only: dashboard, candidate list |
+The project uses AI as an assistant rather than an unquestioned decision-maker. Candidate scoring and interview content should be reviewed by a human recruiter, especially for real hiring decisions.
 
-When `ENABLE_AUTH=false` (default), all endpoints are open (demo mode).
+For responsible use:
 
----
-
-## Security
-
-- Passwords hashed with **bcrypt** (cost factor 12)
-- JWTs signed with **HS256** — rotate `SECRET_KEY` regularly
-- File uploads validated by **magic bytes** (not just extension)
-- Path traversal blocked on uploaded filenames
-- **Security headers** on every response (X-Frame-Options, X-Content-Type-Options, etc.)
-- **Rate limiting** per IP (token bucket; 5 req/s, burst 20)
-- All user actions **audit logged** to database
+- do not infer protected characteristics
+- do not treat model-generated scores as objective truth
+- evaluate scoring consistency across representative candidate groups
+- retain human review for hiring decisions
+- protect uploaded resume data and personally identifiable information
 
 ---
 
-## Deployment (Render)
+## Current engineering priorities
 
-See [`render.yaml`](render.yaml). Set the following in the Render dashboard:
-- `SECRET_KEY` — generate with `python -c "import secrets; print(secrets.token_hex(32))"`
-- `GEMINI_API_KEY` — from Google AI Studio
-- `DATABASE_URL` — PostgreSQL connection string (Render Postgres add-on)
-- `FRONTEND_URL` — your Render static site URL
+- strengthen evaluation of resume scoring quality
+- improve automated regression coverage
+- consolidate historical deployment documentation
+- improve production observability and failure handling
+- add clearer benchmark and model-evaluation reports
+- continue tightening privacy and access-control behavior
 
 ---
 
-## Contributing
+## Project status
 
-1. Fork the repo
-2. Create a feature branch: `git checkout -b feature/my-feature`
-3. Run tests: `pytest`
-4. Open a pull request — CI must pass before merge
+**Status:** active portfolio / engineering project  
+**Focus:** AI-assisted recruitment workflows, full-stack architecture and responsible automation
+
+---
+
+Built by **M. Victor Vengatesh**.
