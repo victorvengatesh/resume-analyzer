@@ -14,7 +14,7 @@ class RequestTimingMiddleware(BaseHTTPMiddleware):
         try:
             response = await call_next(request)
             process_time = time.time() - start_time
-            logger.info(f"Request completed", extra={
+            logger.info("Request completed", extra={
                 "request_id": request_id,
                 "method": request.method,
                 "url": str(request.url.path),
@@ -24,9 +24,9 @@ class RequestTimingMiddleware(BaseHTTPMiddleware):
             response.headers["X-Process-Time"] = str(process_time)
             response.headers["X-Request-ID"] = request_id
             return response
-        except Exception as e:
+        except Exception:
             process_time = time.time() - start_time
-            logger.error(f"Request failed", exc_info=True, extra={
+            logger.error("Request failed", exc_info=True, extra={
                 "request_id": request_id,
                 "method": request.method,
                 "url": str(request.url.path),

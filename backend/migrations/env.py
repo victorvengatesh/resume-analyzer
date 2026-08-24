@@ -11,13 +11,13 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 from backend.core.config import settings
 from backend.db.database import Base
 # Import all models to ensure they are registered on Base.metadata
-import backend.models.resume
-import backend.models.activity
-import backend.models.batch
-import backend.models.interview
-import backend.models.user
-import backend.models.workspace
-import backend.models.audit_log
+import backend.models.resume  # noqa: E402,F401
+import backend.models.activity  # noqa: E402,F401
+import backend.models.batch  # noqa: E402,F401
+import backend.models.interview  # noqa: E402,F401
+import backend.models.user  # noqa: E402,F401
+import backend.models.workspace  # noqa: E402,F401
+import backend.models.audit_log  # noqa: E402,F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

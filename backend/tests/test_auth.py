@@ -2,7 +2,6 @@
 Tests for authentication endpoints: register, login, refresh, logout,
 /me, change-password, and RBAC enforcement.
 """
-import pytest
 
 
 # ── Registration ─────────────────────────────────────────────────

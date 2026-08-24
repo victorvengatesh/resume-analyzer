@@ -2,8 +2,6 @@
 Tests for Settings configuration loading and defaults.
 """
 import importlib
-import os
-import pytest
 
 
 def reload_settings():

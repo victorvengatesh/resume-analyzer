@@ -18,7 +18,7 @@ alembic==1.14.0
 
 # ── Data validation ───────────────────────────────────────────────────────────
 # pydantic 2.10.x ships pre-built wheels for Python 3.11 on all platforms
-pydantic==2.10.4
+pydantic[email]==2.10.4
 pydantic-settings==2.7.1
 # pydantic-core is a transitive dependency of pydantic — pip resolves it
 # automatically. Pinning it explicitly prevents accidental downgrades.
