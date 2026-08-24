@@ -37,6 +37,9 @@ jobs:
       - name: Lint backend
         run: ruff check backend/
 
+      - name: Type-check schemas and core modules
+        run: pyright --pythonpath "$(which python)" backend/schemas backend/core
+
       - name: Run tests
         env:
           DATABASE_URL: "sqlite:///:memory:"
