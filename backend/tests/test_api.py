@@ -3,8 +3,6 @@ API integration tests for resume endpoints, batch endpoints,
 analytics, exports, and health check.
 Uses auth-disabled client (open-access mode) for simplicity.
 """
-import io
-import pytest
 
 
 # ── Health ────────────────────────────────────────────────────────

@@ -2,8 +2,6 @@
 Tests for security utilities: password hashing, JWT tokens,
 password-strength validation, rate limiter.
 """
-import time
-import pytest
 from backend.services.auth_service import (
     get_password_hash,
     verify_password,

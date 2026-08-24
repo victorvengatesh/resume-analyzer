@@ -13,19 +13,16 @@ from backend.api.v1.exports import router as exports_router
 from backend.api.v1.batch import router as batch_router
 from backend.api.v1.interview import router as interview_router
 from backend.api.v1.auth import router as auth_router
+import backend.models.activity  # noqa: F401
+import backend.models.audit_log  # noqa: F401
+import backend.models.batch  # noqa: F401
+import backend.models.interview  # noqa: F401
+import backend.models.user  # noqa: F401
+import backend.models.workspace  # noqa: F401
 from datetime import datetime, timezone
 
 # Setup Logging
 logger = setup_logging()
-
-# Import all models to ensure they're registered with SQLAlchemy
-import backend.models.batch  # noqa: F401
-import backend.models.interview  # noqa: F401
-import backend.models.activity  # noqa: F401
-import backend.models.user  # noqa: F401
-import backend.models.workspace  # noqa: F401
-import backend.models.audit_log  # noqa: F401
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

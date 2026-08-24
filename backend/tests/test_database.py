@@ -2,10 +2,8 @@
 Tests for the database layer: BaseRepository CRUD, ResumeRepository,
 and the check_db_connection helper.
 """
-import pytest
 from backend.db.database import check_db_connection
 from backend.models.resume import Resume
-from backend.models.user import User, Role
 from backend.repositories.resume_repository import ResumeRepository
 from backend.repositories.base import BaseRepository
 

@@ -16,7 +16,6 @@ Adds:
 """
 from typing import Sequence, Union
 from alembic import op
-import sqlalchemy as sa
 
 revision: str = 'a2f3c8d1e904'
 down_revision: Union[str, Sequence[str], None] = '15c018e17e45'
