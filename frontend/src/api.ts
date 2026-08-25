@@ -19,6 +19,10 @@ export type AnalysisResult = {
   job_applied: string;
   match_level: string;
   explanation: string;
+  semantic_alignment?: string;
+  impact_analysis?: string;
+  critical_gaps?: string[];
+  actionable_feedback?: string[];
   missing_skills: string[];
   strengths: string[];
   gaps: string[];
@@ -344,6 +348,20 @@ function buildMockResult(file: File, jobRole: string, index: number): AnalysisRe
       `Profile shows ${expYears} year(s) of experience with skills in ` +
       `${skillSet.slice(0, 3).join(', ')}. ` +
       `Connect the backend and set GEMINI_API_KEY for real AI analysis.`,
+    semantic_alignment:
+      `The profile shows transferable evidence for ${jobRole || 'the target role'} through ` +
+      `${skillSet.slice(0, 3).join(', ')}. This is generated demo content; connect the backend for evidence-grounded analysis.`,
+    impact_analysis:
+      'The offline demo cannot verify quantified outcomes. Add baselines, final metrics, scope, and measurement windows to the strongest project bullets.',
+    critical_gaps: [
+      `No verified evidence for ${MISSING_POOL[(seed + 1) % MISSING_POOL.length]}`,
+      'Business impact claims need measurable outcomes',
+    ],
+    actionable_feedback: [
+      `Connect ${skillSet[0]} to a shipped feature and state your exact ownership.`,
+      'Rewrite one project bullet with a baseline, final metric, and measurement window.',
+      `Add direct evidence for ${MISSING_POOL[(seed + 1) % MISSING_POOL.length]} if it is relevant to the target role.`,
+    ],
     missing_skills: MISSING_POOL.filter((_, i) => (seed + i) % 3 === 0).slice(0, 2),
     strengths: [
       `Proficiency in ${skillSet[0]} and ${skillSet[1]}`,
@@ -365,12 +383,16 @@ function buildMockResult(file: File, jobRole: string, index: number): AnalysisRe
 export const analyzeResume = async (
   file: File,
   jobRole: string,
+  jobDescription?: string,
 ): Promise<AnalysisResult> => {
   const token = getAuthToken();
 
   const apiCall = async (): Promise<AnalysisResult> => {
     const formData = new FormData();
     formData.append('file', file);
+    if (jobDescription?.trim()) {
+      formData.append('job_description', jobDescription.trim());
+    }
     const res = await fetch(
       `${API_BASE}/api/v1/analyze?job_role=${encodeURIComponent(jobRole)}`,
       {
