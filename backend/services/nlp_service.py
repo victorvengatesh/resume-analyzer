@@ -439,10 +439,13 @@ class NLPService:
                 scores.append(0.0)
 
         context = "\n\n---\n\n".join(context_list)
+        # The retrieved fragments focus the model, while a bounded copy of the
+        # full resume prevents impact or cross-section evidence from being lost.
+        resume_evidence = cleaned_text[:14000]
         confidence = max(scores, default=0.0)
 
         api_key = os.getenv("GEMINI_API_KEY")
-        if api_key and api_key.strip() and api_key != "your_gemini_api_key_here" and context_list:
+        if api_key and api_key.strip() and api_key != "your_gemini_api_key_here":
             try:
                 from google import genai
                 from pydantic import BaseModel, Field
@@ -460,7 +463,7 @@ class NLPService:
                     "You are an elite Technical Recruiter and advanced Applicant Tracking System. "
                     "Evaluate the provided resume evidence against the job description. Focus on "
                     "semantic relevance, transferable experience, business impact, and skill "
-                    "alignment rather than exact keyword matches. Use only supplied evidence, "
+                    "alignment rather than exact keyword matches. Use only supplied resume evidence, "
                     "never invent qualifications, and return strict JSON only."
                 )
 
@@ -468,7 +471,10 @@ class NLPService:
 Job Requirement:
 {query}
 
-Resume Context Fragments:
+Full Resume Evidence:
+{resume_evidence}
+
+Most Relevant Resume Fragments:
 {context}
 
 Return one strict JSON object with exactly these fields:
