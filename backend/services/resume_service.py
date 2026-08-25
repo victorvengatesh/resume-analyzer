@@ -123,7 +123,12 @@ class FileProcessor:
 
 class ResumeService:
     @staticmethod
-    def process_single_resume(file_content: bytes, filename: str, job_role: str) -> Dict[str, Any]:
+    def process_single_resume(
+        file_content: bytes,
+        filename: str,
+        job_role: str,
+        job_description: Optional[str] = None,
+    ) -> Dict[str, Any]:
         if len(file_content) > settings.max_file_bytes:
             raise ValueError(f"File {filename} exceeds max size")
 
@@ -140,14 +145,20 @@ class ResumeService:
             links = find_links(text)
             years = parse_experience(text)
 
-            # Build a semantic query from the job role and skills mentioned in it
+            # Prefer the full job description when supplied. Keep job_role as
+            # the concise stored label so candidate records remain scannable.
             # NLPService will also do keyword extraction on the full text
             from backend.services.nlp_service import COMMON_SKILLS
-            job_lower = job_role.lower()
+            analysis_target = (job_description or job_role).strip()
+            job_lower = analysis_target.lower()
             # Find skills mentioned in the job role string
             role_skills = [s for s in COMMON_SKILLS if s in job_lower]
             extras = ", ".join(role_skills[:8]) if role_skills else "python, sql, communication"
-            semantic_query = f"{job_role}. Required skills and qualifications: {extras}"
+            semantic_query = (
+                analysis_target
+                if job_description and job_description.strip()
+                else f"{job_role}. Required skills and qualifications: {extras}"
+            )
 
             chunks = NLPService.chunk_document(text)
             index = EndeeIndex()
@@ -169,6 +180,10 @@ class ResumeService:
                 "score": rag_result.get("score", 0),
                 "match_level": rag_result.get("match_level", "Weak Match"),
                 "explanation": rag_result.get("explanation", ""),
+                "semantic_alignment": rag_result.get("semantic_alignment", rag_result.get("explanation", "")),
+                "impact_analysis": rag_result.get("impact_analysis", ""),
+                "critical_gaps": rag_result.get("critical_gaps", rag_result.get("gaps", [])),
+                "actionable_feedback": rag_result.get("actionable_feedback", []),
                 "strengths": rag_result.get("strengths", []),
                 "gaps": rag_result.get("gaps", []),
                 "education": rag_result.get("education", []),
