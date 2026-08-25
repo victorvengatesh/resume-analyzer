@@ -271,6 +271,14 @@ class NLPService:
                 "education": [],
                 "projects": [],
                 "certifications": [],
+                "semantic_alignment": "No semantic comparison was possible because no readable resume text was extracted.",
+                "impact_analysis": "No quantified achievements or project outcomes could be verified.",
+                "critical_gaps": ["Resume text extraction failed or returned empty content."],
+                "actionable_feedback": [
+                    "Upload a text-selectable PDF or DOCX so the ATS can extract evidence.",
+                    "Add measurable outcomes to experience bullets using a baseline and final result.",
+                    "Tailor the skills and experience sections to the supplied job description."
+                ],
                 "retrieved_chunks": [],
                 "confidence": 0.0
             }
@@ -312,6 +320,14 @@ class NLPService:
                 "education": [],
                 "projects": [],
                 "certifications": [],
+                "semantic_alignment": explanation,
+                "impact_analysis": "No role-relevant quantified outcome was retrieved with enough confidence.",
+                "critical_gaps": [f"Missing or unclear: {s}" for s in missing[:4]] if missing else ["Role-specific evidence is limited."],
+                "actionable_feedback": [
+                    "Rewrite the summary to name the target role and strongest matching technical evidence.",
+                    "Add metrics, baselines, and scope to at least two experience or project bullets.",
+                    "Show where each required skill was applied instead of listing skills without context."
+                ],
                 "retrieved_chunks": [],
                 "confidence": 0.0
             }
@@ -369,6 +385,14 @@ class NLPService:
             "education": [],
             "projects": [],
             "certifications": [],
+            "semantic_alignment": explanation,
+            "impact_analysis": "The fallback evaluator found relevant evidence but cannot reliably verify business impact without the AI evaluation engine.",
+            "critical_gaps": gaps,
+            "actionable_feedback": [
+                "Tie each matching skill to a specific project, responsibility, or shipped feature.",
+                "Quantify at least two outcomes with a baseline, final result, and measurement window.",
+                "Add direct evidence for the highest-priority missing job requirement."
+            ],
             "retrieved_chunks": top_chunks,
             "confidence": round(best_score, 3)
         }
@@ -391,6 +415,14 @@ class NLPService:
                 "explanation": "No readable text could be extracted from this resume.",
                 "strengths": [],
                 "gaps": ["Text extraction returned empty content."],
+                "semantic_alignment": "No semantic comparison was possible because no readable resume text was extracted.",
+                "impact_analysis": "No quantified achievements or project outcomes could be verified.",
+                "critical_gaps": ["Text extraction returned empty content."],
+                "actionable_feedback": [
+                    "Upload a text-selectable PDF or DOCX so the ATS can extract evidence.",
+                    "Add measurable outcomes to experience bullets using a baseline and final result.",
+                    "Tailor the skills and experience sections to the supplied job description."
+                ],
                 "retrieved_chunks": [],
                 "confidence": 0.0
             }
@@ -413,28 +445,23 @@ class NLPService:
         if api_key and api_key.strip() and api_key != "your_gemini_api_key_here" and context_list:
             try:
                 from google import genai
-                from pydantic import BaseModel
+                from pydantic import BaseModel, Field
 
-                class RAGResult(BaseModel):
-                    score: int
-                    match_level: str
-                    skills_found: List[str]
-                    missing_skills: List[str]
-                    explanation: str
-                    strengths: List[str]
-                    gaps: List[str]
-                    education: List[str]
-                    projects: List[str]
-                    certifications: List[str]
+                class DeepATSResult(BaseModel):
+                    overall_score: int
+                    semantic_alignment: str
+                    impact_analysis: str
+                    critical_gaps: List[str]
+                    actionable_feedback: List[str] = Field(min_length=3, max_length=3)
 
                 client = genai.Client(api_key=api_key)
 
                 system_instruction = (
-                    "You are a Senior Technical Recruiter evaluating a candidate for a job role. "
-                    "Use ONLY the provided resume context fragments. "
-                    "Do not assume or invent any missing details. "
-                    "Be objective, concise, and evidence-based. "
-                    "Return strict JSON only."
+                    "You are an elite Technical Recruiter and advanced Applicant Tracking System. "
+                    "Evaluate the provided resume evidence against the job description. Focus on "
+                    "semantic relevance, transferable experience, business impact, and skill "
+                    "alignment rather than exact keyword matches. Use only supplied evidence, "
+                    "never invent qualifications, and return strict JSON only."
                 )
 
                 prompt = f"""
@@ -444,26 +471,27 @@ Job Requirement:
 Resume Context Fragments:
 {context}
 
-Return JSON with exactly these fields:
+Return one strict JSON object with exactly these fields:
 {{
-  "score": <integer from 0 to 100>,
-  "match_level": "<Strong Match | Good Match | Moderate Match | Weak Match>",
-  "skills_found": [<list>],
-  "missing_skills": [<list>],
-  "explanation": "<2 to 3 sentence explanation>",
-  "strengths": [<list>],
-  "gaps": [<list>],
-  "education": [<list of degrees/schools>],
-  "projects": [<list of projects>],
-  "certifications": [<list of certifications>]
+  "overall_score": <integer from 0 to 100 reflecting true match quality>,
+  "semantic_alignment": "<detailed evidence-based evaluation of how the candidate's experience translates to the job>",
+  "impact_analysis": "<assessment of quantified achievements, metrics, ownership, and project outcomes>",
+  "critical_gaps": ["<essential technical or soft skills absent or unsupported by evidence>"],
+  "actionable_feedback": [
+    "<specific technical resume improvement 1>",
+    "<specific technical resume improvement 2>",
+    "<specific technical resume improvement 3>"
+  ]
 }}
 
 Rules:
 1. Use ONLY the provided resume context.
-2. Do not infer missing qualifications.
-3. If evidence is weak, lower the score.
-4. Keep it concise and evidence-based.
-5. Output JSON only.
+2. Distinguish an actual missing skill from a skill that is merely not evidenced.
+3. Do not reward keyword repetition; reward demonstrated scope, ownership, and outcomes.
+4. If evidence is weak, lower the score and say what evidence is missing.
+5. Keep all feedback concrete. Name the section, technology, metric, or proof to add.
+6. actionable_feedback must contain exactly three items.
+7. Output JSON only, without markdown or commentary.
 """
 
                 response = client.models.generate_content(
@@ -472,24 +500,40 @@ Rules:
                     config={
                         "system_instruction": system_instruction,
                         "response_mime_type": "application/json",
-                        "response_schema": RAGResult,
+                        "response_schema": DeepATSResult,
                         "temperature": 0.1,
                     },
                 )
 
                 res = json.loads(response.text)
 
+                score = max(0, min(int(res.get("overall_score", 0)), 100))
+                match_level = (
+                    "Strong Match" if score >= 75 else
+                    "Good Match" if score >= 60 else
+                    "Moderate Match" if score >= 40 else
+                    "Weak Match"
+                )
+                skills_found = NLPService._extract_skills(cleaned_text)
+                missing_skills = NLPService._infer_missing_skills(query, skills_found)
+                critical_gaps = res.get("critical_gaps", [])
+                actionable_feedback = res.get("actionable_feedback", [])[:3]
+
                 return {
-                    "score": res.get("score", 0),
-                    "match_level": res.get("match_level", "Weak Match"),
-                    "skills": res.get("skills_found", []),
-                    "missing_skills": res.get("missing_skills", []),
-                    "explanation": res.get("explanation", "No explanation provided."),
-                    "strengths": res.get("strengths", []),
-                    "gaps": res.get("gaps", []),
-                    "education": res.get("education", []),
-                    "projects": res.get("projects", []),
-                    "certifications": res.get("certifications", []),
+                    "score": score,
+                    "match_level": match_level,
+                    "skills": skills_found,
+                    "missing_skills": missing_skills,
+                    "explanation": res.get("semantic_alignment", "No explanation provided."),
+                    "strengths": [res.get("impact_analysis", "")] if res.get("impact_analysis") else [],
+                    "gaps": critical_gaps,
+                    "education": [],
+                    "projects": [],
+                    "certifications": [],
+                    "semantic_alignment": res.get("semantic_alignment", ""),
+                    "impact_analysis": res.get("impact_analysis", ""),
+                    "critical_gaps": critical_gaps,
+                    "actionable_feedback": actionable_feedback,
                     "retrieved_chunks": context_list[:3],
                     "confidence": round(confidence, 3)
                 }
