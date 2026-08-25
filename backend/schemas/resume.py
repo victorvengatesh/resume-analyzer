@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
 
@@ -17,6 +17,10 @@ class AnalyzeResponse(BaseModel):
     job_applied: str
     match_level: str
     explanation: str
+    semantic_alignment: str = ""
+    impact_analysis: str = ""
+    critical_gaps: List[str] = Field(default_factory=list)
+    actionable_feedback: List[str] = Field(default_factory=list)
     missing_skills: List[str]
     strengths: List[str]
     gaps: List[str]
@@ -39,6 +43,10 @@ class CandidateOut(BaseModel):
     score: float
     match_level: str
     explanation: str
+    semantic_alignment: str = ""
+    impact_analysis: str = ""
+    critical_gaps: List[str] = Field(default_factory=list)
+    actionable_feedback: List[str] = Field(default_factory=list)
     strengths: List[str]
     gaps: List[str]
     education: List[str]
