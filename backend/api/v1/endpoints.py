@@ -1,7 +1,7 @@
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from sqlalchemy.orm import Session
 
 from backend.api.v1.dependencies import get_current_user, require_roles
@@ -39,6 +39,10 @@ def _result_to_resume(result: dict) -> Resume:
         total_score=result.get("score", 0),
         match_level=result.get("match_level", "Weak Match"),
         explanation=result.get("explanation", ""),
+        semantic_alignment=result.get("semantic_alignment", result.get("explanation", "")),
+        impact_analysis=result.get("impact_analysis", ""),
+        critical_gaps=result.get("critical_gaps", result.get("gaps", [])),
+        actionable_feedback=result.get("actionable_feedback", []),
         strengths=result.get("strengths", []),
         gaps=result.get("gaps", []),
         education=result.get("education", []),
@@ -68,6 +72,10 @@ def _resume_to_response(r: Resume) -> AnalyzeResponse:
         job_applied=r.job_applied,
         match_level=r.match_level or "Weak Match",
         explanation=r.explanation or "",
+        semantic_alignment=r.semantic_alignment or r.explanation or "",
+        impact_analysis=r.impact_analysis or "",
+        critical_gaps=r.critical_gaps or r.gaps or [],
+        actionable_feedback=r.actionable_feedback or [],
         missing_skills=r.missing_skills or [],
         strengths=r.strengths or [],
         gaps=r.gaps or [],
@@ -95,13 +103,19 @@ def _resume_to_response(r: Resume) -> AnalyzeResponse:
 async def analyze_one(
     request: Request,
     job_role: str = Query(..., description="Job role to match against"),
+    job_description: Optional[str] = Form(None, description="Full job description for semantic matching"),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user),
 ):
     """Analyze a single resume against a job role and persist the result."""
     content = await secure_file_validation(file)
-    result = ResumeService.process_single_resume(content, file.filename, job_role)
+    result = ResumeService.process_single_resume(
+        content,
+        file.filename,
+        job_role,
+        job_description=job_description,
+    )
 
     resume = _result_to_resume(result)
     resume_repo = ResumeRepository(db)
