@@ -14,6 +14,9 @@ export default function UploadPage() {
   const [mode, setMode] = useState<Mode>('single');
   const [files, setFiles] = useState<File[]>([]);
   const [jobRole, setJobRole] = useState('Senior React Architect');
+  const [jobDescription, setJobDescription] = useState(
+    'Lead React architecture, improve web performance, mentor engineers, and partner with product teams to deliver measurable customer outcomes.'
+  );
   const [results, setResults] = useState<AnalysisResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -56,11 +59,11 @@ export default function UploadPage() {
     
     try {
       if (mode === 'single') {
-        const r = await analyzeResume(files[0], jobRole);
+        const r = await analyzeResume(files[0], jobRole, jobDescription);
         setResults([r]);
         success('Analysis Complete', `Resume parsed with a score of ${Math.round(r.total_score)}%.`);
       } else {
-        const r = await batchAnalyzeResumes(files, jobRole, (pct) => {
+        const r = await batchAnalyzeResumes(files, jobDescription || jobRole, (pct) => {
           setProgress(pct);
         });
         setResults(r);
@@ -123,6 +126,21 @@ export default function UploadPage() {
           disabled={loading}
           required
         />
+
+        <div className="space-y-2">
+          <label htmlFor="job-description" className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+            Full Job Description <span className="text-accent-cyan">(semantic context)</span>
+          </label>
+          <textarea
+            id="job-description"
+            value={jobDescription}
+            onChange={e => setJobDescription(e.target.value)}
+            placeholder="Paste the responsibilities, required skills, and success criteria."
+            disabled={loading}
+            required
+            className="deep-ats-textarea"
+          />
+        </div>
 
         {/* Drop zone */}
         <div className="space-y-2">
@@ -260,7 +278,8 @@ export default function UploadPage() {
                   // patching mismatched nodes in place.
                   key={r.id}
                   variants={listItem}
-                  className="glass-panel border border-glass-border rounded-2xl p-6 space-y-4 hover:border-violet-500/20 transition-all duration-300"
+                  whileHover={{ y: -4, rotateX: 0.6, rotateY: -0.6 }}
+                  className="glass-panel deep-result-card border border-glass-border rounded-2xl p-6 space-y-4 hover:border-cyan-400/20 transition-all duration-300"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-center gap-3">
@@ -292,6 +311,45 @@ export default function UploadPage() {
 
                   {/* Explanation */}
                   <p className="text-xs text-slate-400 leading-relaxed leading-normal">{r.explanation}</p>
+
+                  <div className="deep-analysis-grid">
+                    <details open>
+                      <summary>
+                        <span>Semantic alignment</span>
+                        <strong>Evidence</strong>
+                      </summary>
+                      <p>{r.semantic_alignment || r.explanation}</p>
+                    </details>
+                    <details>
+                      <summary>
+                        <span>Impact analysis</span>
+                        <strong>Outcomes</strong>
+                      </summary>
+                      <p>{r.impact_analysis || r.strengths?.join(' ') || 'No quantified impact was verified.'}</p>
+                    </details>
+                    <details>
+                      <summary>
+                        <span>Critical gaps</span>
+                        <strong>{(r.critical_gaps || r.gaps || []).length} found</strong>
+                      </summary>
+                      <ul>
+                        {(r.critical_gaps || r.gaps || ['No critical gaps returned.']).map(gap => <li key={gap}>{gap}</li>)}
+                      </ul>
+                    </details>
+                    <details>
+                      <summary>
+                        <span>Actionable feedback</span>
+                        <strong>3 actions</strong>
+                      </summary>
+                      <ol>
+                        {(r.actionable_feedback || [
+                          'Tie a matching skill to a specific shipped outcome.',
+                          'Add a baseline and final metric to one achievement.',
+                          'Provide direct evidence for the highest-priority job requirement.',
+                        ]).map(item => <li key={item}>{item}</li>)}
+                      </ol>
+                    </details>
+                  </div>
 
                   <div className="flex items-center justify-between border-t border-glass-border pt-3">
                     {/* Skills */}
